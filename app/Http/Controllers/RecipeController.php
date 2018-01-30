@@ -6,6 +6,7 @@ use App\RecipeDirection;
 use App\RecipeIngredient;
 use Illuminate\Http\Request;
 use App\Recipe;
+use File;
 class RecipeController extends Controller
 {
 
@@ -116,6 +117,7 @@ class RecipeController extends Controller
         return response()->json([
             'recipe'=>$recipe
         ]);
+   
     }
 
 
@@ -125,9 +127,18 @@ class RecipeController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit($id,Request $request)
     {
         //
+        $form = $request->user()->recipes()
+                ->with(['ingredients'=>function($query){
+                    $query->get(['id','name','qty']);
+                },'directions'=>function($query){
+                    $query->get(['id','description']);
+                }])->findOrFail($id,['id','name','description','image ']);
+
+        return response()->json(['form'=>$form]);
+
     }
 
     /**
@@ -140,6 +151,94 @@ class RecipeController extends Controller
     public function update(Request $request, $id)
     {
         //
+        $this->validate($request,[
+            'name'=>'required|max:255',
+            'description'=>'required|max:3000',
+            'image'=>'required|image',
+            'ingredients'=>'required|array|min:1',
+            'ingredients.*.id'=>'integer|exists:recipe_ingredients',
+            'ingredients.*.name'=>'required|max:255',
+            'ingredients.*.qty'=>'required|max:255',
+            'directions'=>'required|array|min:1',
+            'ingredients.*.id'=>'integer|exists:recipe_directions',
+            'directions.*.description'=>'required|max:3000'
+        ]);
+
+        $recipe = $request->user()->recipes()->findOrFail($id);
+        $ingredients = [];
+        $ingredientsUpdated = [];
+
+        foreach($request->ingredients as $item){
+             if(isset($item['id'])){
+                //update
+                RecipeIngredient::where('recipe_id',$recipe->id)
+                ->where('id',$item['id'])->update($item);
+
+                $ingredientsUpdated[] = $item['id'];
+                
+             }else{
+                $ingredients[] = new RecipeIngredient($item);
+             }
+        }
+
+        $directions = [];
+        $directionsUpdated = [];
+
+        foreach($request->directions as $item){
+             if(isset($item['id'])){
+                //update
+                RecipeDirection::where('recipe_id',$recipe->id)
+                ->where('id',$item['id'])->update($item);
+
+                $directionsUpdated[] = $item['id'];
+                
+             }else{
+                $directions[] = new RecipeIngredient($item);
+             }
+        }
+
+
+        $recipe->name = $request->name;
+        $recipe->description = $request->description;
+
+        if($request->hashFile('image') && $request->file('image')->isValid() ){
+            $filename = $this->getFilename($request->image);
+            $request->image->move(base_path('public/images' ),$filename);
+            
+            //remove image old
+             File::delete(base_path('public/images'.$recipe->image));
+            $recipe->image = $filename;
+        }
+
+        $recipe->save();
+
+        //delte all ids expect updated
+
+        RecipeIngredient::whereNotIn('id',$ingredientsUpdated)
+            ->where('recipe_id',$recipe->id)
+            ->delete();
+        
+            RecipeDirection::where('id',$directionsUpdated)
+            ->where('recipe_id',$recipe->id)
+            ->delete();
+
+        //create new item if exist
+        if(count(ingredients )){
+            $recipe->ingredients()->saveMany($ingredients);
+        }
+
+        if(count(directions )){
+            $recipe->directions()->saveMany($directions);
+        }
+
+
+        return response()->json([
+            'saved'=>true,
+            'id'=>$recipe->id,
+            'message'=> 'you have successfully updated recipe'
+        ]);
+       
+
     }
 
     /**
@@ -148,8 +247,19 @@ class RecipeController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy($id,Request $request)
     {
         //
+        $recipe = $request->user()->recipes()->findOrFail($id);
+
+        RecipeIngredient::where('recipe_id',$request->id)->delete();
+        RecipeDirection::where('recipe_id',$request->id)->delete();
+       
+        File::delete(base_path('public/images'.$recipe->image));
+        $recipe->delete();
+        return response()->json($[
+            'delete'=>true,
+            
+        ]);
     }
 }
