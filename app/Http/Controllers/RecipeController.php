@@ -130,14 +130,25 @@ class RecipeController extends Controller
     public function edit($id,Request $request)
     {
         //
-        $form = $request->user()->recipes()
-                ->with(['ingredients'=>function($query){
-                    $query->get(['id','name','qty']);
-                },'directions'=>function($query){
-                    $query->get(['id','description']);
-                }])->findOrFail($id,['id','name','description','image ']);
 
-        return response()->json(['form'=>$form]);
+        $recipe = Recipe::with(['user','ingredients','directions'])->findOrFail($id);
+        return response()->json([
+            'form'=>$recipe
+        ]);
+/*        $form = $request->user()->recipes()
+            ->with(['ingredients' => function($query) {
+                $query->get(['id', 'name', 'qty']);
+            }, 'directions' => function($query) {
+                $query->get(['id', 'description']);
+            }])
+            ->findOrFail($id, [
+                'id', 'name', 'description', 'image'
+            ]);
+
+        return response()
+            ->json([
+                'form' => $form
+            ]);*/
 
     }
 
@@ -223,11 +234,11 @@ class RecipeController extends Controller
             ->delete();
 
         //create new item if exist
-        if(count(ingredients )){
+        if(count($ingredients )){
             $recipe->ingredients()->saveMany($ingredients);
         }
 
-        if(count(directions )){
+        if(count($directions )){
             $recipe->directions()->saveMany($directions);
         }
 
@@ -257,9 +268,8 @@ class RecipeController extends Controller
        
         File::delete(base_path('public/images'.$recipe->image));
         $recipe->delete();
-        return response()->json($[
+        return response()->json([
             'delete'=>true,
-            
         ]);
     }
 }

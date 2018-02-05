@@ -12,7 +12,8 @@ class Recipe extends Model
     'name','description','image'
     ];
 
-    public function user(){
+    public function user()
+    {
         return $this->belongsTo(User::class);
     }
 

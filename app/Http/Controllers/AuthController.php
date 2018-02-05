@@ -27,7 +27,7 @@ class AuthController extends Controller
             'password'=>'required|between:6,25|confirmed'
         ]);
 
-        $user = new User($request->all());
+      $user = new User($request->all());
         $user->password = bcrypt($request->password);
         $user->save();
 
@@ -39,12 +39,12 @@ class AuthController extends Controller
 
     public function login(Request $request){
 
-        $this->validate($request,[
-            'email'=>'required|email',
-            'password'=>'required|between:6,25'
+        $this->validate($request, [
+            'email' => 'required|email',
+            'password' => 'required|between:6,25'
         ]);
 
-        $user = User::where('email',$request->email)->frist();
+        $user = User::where('email',$request->email)->first();
         if($user && Hash::check($request->password,$user->password)){
             $user->api_token = str_random(60);
             $user->save();
@@ -63,8 +63,11 @@ class AuthController extends Controller
 
     }
 
-    public function logout(){
-
+    public function logout(Request $request){
+     $user = $request->user() ;
+      $user->api_token = null;
+        $user->save();
+        return response()->json(['logged_out'=>true]);
     }
 
 
